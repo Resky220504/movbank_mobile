@@ -22,10 +22,10 @@ class RegisterScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
               // Ícone/Logo
-              Icon(
-                Icons.monetization_on_outlined, // Ícone de exemplo
-                size: 100.0,
-                color: Theme.of(context).primaryColor,
+              // Substituído o Icon pelo Image.asset
+              Image.asset(
+                'assets/images/LOGO.png', // Caminho para sua logo
+                height: 100.0, // Ajuste a altura conforme necessário
               ),
               const SizedBox(height: 50.0),
 
@@ -35,6 +35,7 @@ class RegisterScreen extends StatelessWidget {
                   labelText: 'Usuário',
                 ),
                 keyboardType: TextInputType.text,
+                // TODO: Adicionar controller e lógica de validação/autenticação
               ),
               const SizedBox(height: 20.0),
 
@@ -44,6 +45,7 @@ class RegisterScreen extends StatelessWidget {
                   labelText: 'Senha',
                 ),
                 obscureText: true,
+                // TODO: Adicionar controller e lógica de validação/autenticação
               ),
               const SizedBox(height: 20.0),
 
@@ -53,6 +55,7 @@ class RegisterScreen extends StatelessWidget {
                   labelText: 'Confirme sua senha',
                 ),
                 obscureText: true,
+                // TODO: Adicionar controller e lógica de validação/autenticação
               ),
               const SizedBox(height: 40.0),
 
@@ -61,6 +64,7 @@ class RegisterScreen extends StatelessWidget {
                 onPressed: () {
                   // Lógica de registro aqui (ex: salvar e ir para login/home)
                   print("Botão Criar Conta Pressionado");
+                  // TODO: Implementar lógica de registro real
                   Navigator.pop(context); // Volta para a tela anterior (Login)
                 },
                 child: const Text('Criar conta'),
@@ -70,12 +74,12 @@ class RegisterScreen extends StatelessWidget {
               // Divisor OU
               const Row(
                 children: <Widget>[
-                  Expanded(child: Divider(color: Colors.grey)),
+                  Expanded(child: Divider()),
                   Padding(
                     padding: EdgeInsets.symmetric(horizontal: 8.0),
                     child: Text('OU', style: TextStyle(color: Colors.grey)),
                   ),
-                  Expanded(child: Divider(color: Colors.grey)),
+                  Expanded(child: Divider()),
                 ],
               ),
               const SizedBox(height: 20.0),

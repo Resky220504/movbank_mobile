@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:math'; 
 
 class NovoInvestimentoScreen extends StatefulWidget {
   const NovoInvestimentoScreen({super.key});
@@ -8,37 +9,105 @@ class NovoInvestimentoScreen extends StatefulWidget {
 }
 
 class _NovoInvestimentoScreenState extends State<NovoInvestimentoScreen> {
-  int _selectedIndex = 0; // Para a BottomNavBar (pode ajustar a lógica)
-  String? _tipoTaxaSelecionada; // Para o Dropdown
-  final List<String> _tiposDeTaxa = ['SELIC', 'IPCA', 'Pré-fixada', 'Pós-fixada']; // Opções do Dropdown
+  int _selectedIndex = -1; 
+  String? _tipoTaxaSelecionada;
+  final List<String> _tiposDeTaxa = ['SELIC', 'IPCA', 'Pré-fixada', 'Pós-fixada'];
+  
+  final TextEditingController _valorController = TextEditingController();
+  final TextEditingController _periodoController = TextEditingController();
+  String _resultadoPrevisto = 'Resultado previsto'; 
+
+  @override
+  void dispose() {
+    _valorController.dispose();
+    _periodoController.dispose();
+    super.dispose();
+  }
 
   void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
-      if (index == 0) { // Ex: Voltar para Home (ajuste conforme necessário)
-          Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
-      } else if (index == 2) { // Sair
-          Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+      if (index == 0) { 
+        Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
+      } else if (index == 1) { 
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Tela de Ajustes ainda não implementada.'),
+            duration: Duration(seconds: 1),
+          ),
+        );
+        _selectedIndex = -1; 
+      } else if (index == 2) { 
+        Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
       }
-      // Adicione lógica para o item 1 (Ajustes) se necessário
     });
   }
 
-  // Widget para construir os campos de texto com label
-  Widget _buildTextFieldWithLabel(String label, TextInputType keyboardType) {
+  void _calcularInvestimento() {
+    FocusScope.of(context).unfocus(); 
+
+    final double? valor = double.tryParse(_valorController.text.replaceAll(',', '.')); 
+    final int? periodo = int.tryParse(_periodoController.text);
+    final String? tipoTaxa = _tipoTaxaSelecionada;
+
+    if (valor == null || valor <= 0 || periodo == null || periodo <= 0 || tipoTaxa == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Por favor, preencha todos os campos corretamente.'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+      setState(() {
+         _resultadoPrevisto = 'Erro na entrada';
+      });
+      return;
+    }
+
+    double taxaAnual = 0.0;
+    // TODO: Buscar taxas reais de uma API ou configuração
+    switch (tipoTaxa) {
+      case 'SELIC':
+        taxaAnual = 0.1050; // Exemplo: 10.50% a.a. (valor atual da Selic em Maio/2024 era ~10.50%)
+        break;
+      case 'IPCA':
+        taxaAnual = 0.0380; // Exemplo: IPCA acumulado 12 meses ~3.80% (Maio/2024) + spread (ex: +5% = 0.0880)
+        // Para IPCA + X%, você precisaria de outro campo para o X% ou um valor fixo de spread.
+        // Aqui, vamos simular IPCA + 5% = 0.0380 (IPCA) + 0.05 (spread) = 0.0880
+        taxaAnual = 0.0380 + 0.05; // IPCA + 5%
+        break;
+      case 'Pré-fixada':
+        taxaAnual = 0.11; // Exemplo: 11% a.a.
+        break;
+      case 'Pós-fixada':
+        // Geralmente atrelada a um % do CDI. CDI é próximo da SELIC.
+        // Exemplo: 100% do CDI (CDI ~ SELIC - 0.10%)
+        double cdiEstimado = 0.1040; // Exemplo: 10.40% a.a.
+        taxaAnual = cdiEstimado * 1.0; // 100% do CDI
+        break;
+    }
+
+    double taxaMensal = pow(1 + taxaAnual, 1 / 12) - 1;
+    double resultado = valor * pow(1 + taxaMensal, periodo.toDouble()); // periodo precisa ser double para pow
+
+    setState(() {
+      _resultadoPrevisto = 'R\$ ${resultado.toStringAsFixed(2)}';
+    });
+  }
+
+  Widget _buildTextFieldWithLabel(String label, TextInputType keyboardType, TextEditingController controller) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(label, style: const TextStyle(fontSize: 16, color: Colors.white70)),
         const SizedBox(height: 8.0),
         TextFormField(
+          controller: controller, 
           decoration: InputDecoration(
-            // Remove o label de dentro do campo se já temos um fora
-            // labelText: label, // Opcional: pode remover
+             // Estilo herdado do tema global
           ),
           keyboardType: keyboardType,
         ),
-        const SizedBox(height: 20.0), // Espaçamento entre os campos
+        const SizedBox(height: 20.0), 
       ],
     );
   }
@@ -49,39 +118,35 @@ class _NovoInvestimentoScreenState extends State<NovoInvestimentoScreen> {
       appBar: AppBar(
         title: const Text('Novo investimento'),
         centerTitle: true,
-        // O botão de voltar será adicionado automaticamente pelo Navigator
       ),
       body: SingleChildScrollView(
         child: Column(
           children: [
-            // --- Cabeçalho com Imagem de Fundo ---
             Stack(
               alignment: Alignment.center,
               children: [
-                // Imagem de Fundo (Use uma imagem sua ou um Container colorido)
                 Container(
                   height: 150,
                   decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.4), // Cor de fallback
+                    color: Colors.black.withOpacity(0.4),
                     image: DecorationImage(
-                      image: const NetworkImage('https://via.placeholder.com/600x200.png/222222/FFFFFF?text=Fundo+Mercado'), // Use sua imagem aqui!
+                      image: const NetworkImage('https://via.placeholder.com/600x200.png/222222/FFFFFF?text=Fundo+Mercado'), // Placeholder
                       fit: BoxFit.cover,
                       colorFilter: ColorFilter.mode(
-                        Colors.black.withOpacity(0.6), // Escurece a imagem
+                        Colors.black.withOpacity(0.6),
                         BlendMode.darken,
                       ),
                     ),
                   ),
                 ),
-                // Logo e Título sobrepostos
                 Positioned(
-                   top: 15,
-                   left: 15,
-                   child: Icon(
-                      Icons.monetization_on_outlined,
-                      size: 40.0,
-                      color: Theme.of(context).primaryColor,
-                   ),
+                  top: 15,
+                  left: 15,
+                  // Substituído o Icon pelo Image.asset
+                  child: Image.asset(
+                    'assets/images/LOGO.png', // Caminho para sua logo
+                     height: 40.0, // Ajuste a altura conforme necessário
+                  ),
                 ),
                 const Text(
                   'Novo Investimento',
@@ -94,33 +159,29 @@ class _NovoInvestimentoScreenState extends State<NovoInvestimentoScreen> {
                 ),
               ],
             ),
-            // --- Formulário ---
             Padding(
               padding: const EdgeInsets.all(25.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
-                  _buildTextFieldWithLabel('Valor', TextInputType.numberWithOptions(decimal: true)),
-                  _buildTextFieldWithLabel('Período (meses)', TextInputType.number),
+                  _buildTextFieldWithLabel('Valor (R\$)', const TextInputType.numberWithOptions(decimal: true), _valorController),
+                  _buildTextFieldWithLabel('Período (meses)', TextInputType.number, _periodoController),
 
-                  // Campo Tipo de Taxa (Dropdown)
                   const Text('Tipo de taxa', style: TextStyle(fontSize: 16, color: Colors.white70)),
                   const SizedBox(height: 8.0),
                   DropdownButtonFormField<String>(
                     value: _tipoTaxaSelecionada,
                     hint: const Text('Selecione...'),
                     isExpanded: true,
-                    decoration: InputDecoration(
-                       contentPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 16.0),
-                       fillColor: Colors.grey[800], // Garante cor de fundo
-                       filled: true,
-                       border: OutlineInputBorder(
-                         borderRadius: BorderRadius.circular(8.0),
-                         borderSide: BorderSide.none,
-                       ),
+                    decoration: InputDecoration( 
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 16.0),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8.0),
+                        borderSide: BorderSide.none,
+                      ),
                     ),
-                    dropdownColor: Colors.grey[850], // Cor do menu suspenso
-                    icon: const Icon(Icons.arrow_drop_down, color: Colors.limeAccent),
+                    dropdownColor: Colors.grey[850],
+                    icon: Icon(Icons.arrow_drop_down, color: Theme.of(context).primaryColor),
                     items: _tiposDeTaxa.map((String value) {
                       return DropdownMenuItem<String>(
                         value: value,
@@ -135,13 +196,8 @@ class _NovoInvestimentoScreenState extends State<NovoInvestimentoScreen> {
                   ),
                   const SizedBox(height: 40.0),
 
-                  // Botão Calcular
                   ElevatedButton(
-                    onPressed: () {
-                      // Lógica de cálculo aqui
-                      print("Calcular Pressionado");
-                      // Atualizar o container de resultado
-                    },
+                    onPressed: _calcularInvestimento, 
                     style: ElevatedButton.styleFrom(
                       minimumSize: const Size(double.infinity, 50),
                     ),
@@ -149,19 +205,23 @@ class _NovoInvestimentoScreenState extends State<NovoInvestimentoScreen> {
                   ),
                   const SizedBox(height: 30.0),
 
-                  // Container Resultado
                   Container(
                     width: double.infinity,
-                    height: 100, // Altura de exemplo
+                    height: 100,
                     padding: const EdgeInsets.all(16.0),
                     decoration: BoxDecoration(
                       color: Colors.grey[850],
                       borderRadius: BorderRadius.circular(12.0),
+                      border: Border.all(color: Theme.of(context).primaryColor.withOpacity(0.5))
                     ),
-                    child: const Center(
+                    child: Center(
                       child: Text(
-                        'Resultado previsto',
-                        style: TextStyle(fontSize: 18, color: Colors.white54),
+                        _resultadoPrevisto, 
+                        style: TextStyle(
+                            fontSize: 24, 
+                            color: _resultadoPrevisto.startsWith('R\$') ? Colors.greenAccent : Colors.white54,
+                            fontWeight: FontWeight.bold
+                        ),
                       ),
                     ),
                   ),
@@ -174,8 +234,8 @@ class _NovoInvestimentoScreenState extends State<NovoInvestimentoScreen> {
       bottomNavigationBar: BottomNavigationBar(
         items: const <BottomNavigationBarItem>[
           BottomNavigationBarItem(
-            icon: Icon(Icons.person_outline),
-            label: 'Perfil',
+            icon: Icon(Icons.home_outlined), 
+            label: 'Home', 
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.settings_outlined),
@@ -186,10 +246,7 @@ class _NovoInvestimentoScreenState extends State<NovoInvestimentoScreen> {
             label: 'Sair',
           ),
         ],
-        currentIndex: _selectedIndex,
-        selectedItemColor: Theme.of(context).primaryColor,
-        unselectedItemColor: Colors.grey[600],
-        backgroundColor: Colors.grey[850],
+        currentIndex: _selectedIndex == -1 ? 0 : _selectedIndex, 
         onTap: _onItemTapped,
         type: BottomNavigationBarType.fixed,
         showUnselectedLabels: true,

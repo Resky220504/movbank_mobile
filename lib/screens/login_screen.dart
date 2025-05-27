@@ -9,6 +9,7 @@ class LoginScreen extends StatelessWidget {
       appBar: AppBar(
         title: const Text('Login'),
         centerTitle: true,
+        automaticallyImplyLeading: false, // Impede o botão de voltar automático
       ),
       body: Center(
         child: SingleChildScrollView(
@@ -29,8 +30,10 @@ class LoginScreen extends StatelessWidget {
               TextFormField(
                 decoration: const InputDecoration(
                   labelText: 'Usuário',
+                  // hintText: 'Digite seu usuário', // Adicionado hintText
                 ),
                 keyboardType: TextInputType.text,
+                // TODO: Adicionar controller e lógica de validação/autenticação
               ),
               const SizedBox(height: 20.0),
 
@@ -38,8 +41,10 @@ class LoginScreen extends StatelessWidget {
               TextFormField(
                 decoration: const InputDecoration(
                   labelText: 'Senha',
+                  // hintText: 'Digite sua senha', // Adicionado hintText
                 ),
                 obscureText: true,
+                // TODO: Adicionar controller e lógica de validação/autenticação
               ),
               const SizedBox(height: 40.0),
 
@@ -48,6 +53,8 @@ class LoginScreen extends StatelessWidget {
                 onPressed: () {
                   // Lógica de login aqui (ex: ir para a tela principal)
                   print("Botão Entrar Pressionado");
+                  // **Correção: Navegar para a tela Home e remover a tela de login da pilha**
+                  Navigator.pushReplacementNamed(context, '/home');
                 },
                 child: const Text('Entrar'),
               ),
@@ -56,12 +63,12 @@ class LoginScreen extends StatelessWidget {
               // Divisor OU
               const Row(
                 children: <Widget>[
-                  Expanded(child: Divider(color: Colors.grey)),
+                  Expanded(child: Divider()), // Cor do tema será aplicada
                   Padding(
                     padding: EdgeInsets.symmetric(horizontal: 8.0),
                     child: Text('OU', style: TextStyle(color: Colors.grey)),
                   ),
-                  Expanded(child: Divider(color: Colors.grey)),
+                  Expanded(child: Divider()), // Cor do tema será aplicada
                 ],
               ),
               const SizedBox(height: 20.0),
