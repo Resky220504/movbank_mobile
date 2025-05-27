@@ -16,7 +16,7 @@ class _HomeScreenState extends State<HomeScreen> {
       // Adicione a lógica para cada item aqui (navegação ou ação)
       if (index == 2) {
          // Exemplo: Voltar para login ao clicar em Sair
-         Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+         Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => true);
       }
     });
   }
