@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import 'screens/login_screen.dart';
-import 'screens/register_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/novo_investimento_screen.dart';
 
@@ -64,10 +62,8 @@ class MyApp extends StatelessWidget {
          ),
          dividerColor: Colors.grey[700],
       ),
-      initialRoute: '/login',
+      initialRoute: '/home',
       routes: {
-        '/login': (context) => const LoginScreen(),
-        '/register': (context) => const RegisterScreen(),
         '/home': (context) => const HomeScreen(),
         '/novo_investimento': (context) => const NovoInvestimentoScreen(),
       },

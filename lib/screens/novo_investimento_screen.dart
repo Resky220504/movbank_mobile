@@ -1,5 +1,10 @@
 import 'package:flutter/material.dart';
-import 'dart:math'; 
+import 'dart:math';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'package:intl/intl.dart';
+import 'package:flutter/services.dart';
+
 
 class NovoInvestimentoScreen extends StatefulWidget {
   const NovoInvestimentoScreen({super.key});
@@ -8,46 +13,121 @@ class NovoInvestimentoScreen extends StatefulWidget {
   State<NovoInvestimentoScreen> createState() => _NovoInvestimentoScreenState();
 }
 
+class IpcaProjecaoMensal {
+  final String dataReferenciaMesAno;
+  final double mediana;
+
+  IpcaProjecaoMensal({required this.dataReferenciaMesAno, required this.mediana});
+
+  factory IpcaProjecaoMensal.fromJson(Map<String, dynamic> json) {
+    return IpcaProjecaoMensal(
+      dataReferenciaMesAno: json['DataReferencia'] as String,
+      mediana: json['Mediana'] as double,
+    );
+  }
+}
+
 class _NovoInvestimentoScreenState extends State<NovoInvestimentoScreen> {
-  int _selectedIndex = -1; 
   String? _tipoTaxaSelecionada;
-  final List<String> _tiposDeTaxa = ['SELIC', 'IPCA', 'Pré-fixada', 'Pós-fixada'];
+  final List<String> _tiposDeTaxa = ['Pós-fixado', 'IPCA'];
   
   final TextEditingController _valorController = TextEditingController();
   final TextEditingController _periodoController = TextEditingController();
+  final TextEditingController _porcentagemIpcaController = TextEditingController();
+
   String _resultadoPrevisto = 'Resultado previsto'; 
 
   @override
   void dispose() {
     _valorController.dispose();
     _periodoController.dispose();
+    _porcentagemIpcaController.dispose();
     super.dispose();
   }
 
-  void _onItemTapped(int index) {
-    setState(() {
-      _selectedIndex = index;
-      if (index == 0) { 
-        Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
-      } else if (index == 1) { 
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Tela de Ajustes ainda não implementada.'),
-            duration: Duration(seconds: 1),
-          ),
-        );
-        _selectedIndex = -1; 
-      } else if (index == 2) { 
-        Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+  Future<double> fetchSelicTax() async {
+    final url = Uri.parse('https://api.bcb.gov.br/dados/serie/bcdata.sgs.1178/dados?formato=json&dataInicial=01/01/2025');
+    final response = await http.get(url);
+
+    if (response.statusCode == 200) {
+    final List<dynamic> data = jsonDecode(response.body);
+    
+    if (data.isNotEmpty && data.last['valor'] != null) {
+      return double.parse(data.last['valor']);
+    } else {
+      throw Exception('Lista vazia ou valor não encontrado');
+    }
+  } else {
+    throw Exception('Erro na requisição: ${response.statusCode}');
+  }
+}
+
+Future<List<IpcaProjecaoMensal>> fetchIpcaTax() async {
+    final url = Uri.parse(r"https://olinda.bcb.gov.br/olinda/servico/Expectativas/versao/v1/odata/ExpectativaMercadoMensais?$top=100&$filter=Indicador%20eq%20'IPCA'%20and%20contains(DataReferencia%2C'2026')&$orderby=Data%20desc&$format=json".toString());
+    final response = await http.get(url);
+
+    if (response.statusCode == 200) {
+      final Map<String, dynamic> decodedJson = jsonDecode(response.body);
+      final List<dynamic> rawProjections = decodedJson['value'] as List<dynamic>;
+      final Map<String, IpcaProjecaoMensal> latestProjectionsMap = {};
+      
+      for (var item in rawProjections) {
+        final projecao = IpcaProjecaoMensal.fromJson(item as Map<String, dynamic>);
+        if (!latestProjectionsMap.containsKey(projecao.dataReferenciaMesAno)) {
+          latestProjectionsMap[projecao.dataReferenciaMesAno] = projecao;
+        }
       }
-    });
+      return latestProjectionsMap.values.toList();
+    } else {
+    throw Exception('Erro na requisição: ${response.statusCode}');
+  }
+}
+
+ Future<double> calcularValorFinalCdbIpcaMaisCompleto({
+  required double valorInicial,
+  required double ganhoRealAnualPorcentagem,
+  required int prazoEmMeses,
+  required DateTime dataInicioInvestimento,
+  required List<IpcaProjecaoMensal> todasProjecoesIpcaMensais,
+}) async {
+  if (prazoEmMeses <= 0) {
+    return valorInicial;  
+  }
+  if (prazoEmMeses > 48) {
+    print('Aviso: O cálculo pode ser menos preciso para prazos muito longos (acima de 48 meses).');
   }
 
-  void _calcularInvestimento() {
+  double valorAtual = valorInicial;
+  final DateFormat formatter = DateFormat('MM/yyyy');
+
+  double ganhoRealAnualDecimal = ganhoRealAnualPorcentagem / 100;
+  double ganhoRealMensal = pow((1 + ganhoRealAnualDecimal), (1 / 12)) - 1;
+
+  final Map<String, double> ipcaProjecaoMap = {
+    for (var proj in todasProjecoesIpcaMensais) proj.dataReferenciaMesAno: proj.mediana
+  };
+
+  for (int i = 0; i < prazoEmMeses; i++) {
+    DateTime mesProjecao = DateTime(dataInicioInvestimento.year, dataInicioInvestimento.month + 1 + i, 1);
+    String keyMesProjecao = formatter.format(mesProjecao);
+
+    double ipcaDoMesPorcentagem = ipcaProjecaoMap[keyMesProjecao] ?? 0.0;
+
+    double ipcaDoMesDecimal = ipcaDoMesPorcentagem / 100;
+
+    valorAtual *= (1 + ipcaDoMesDecimal);
+    valorAtual *= (1 + ganhoRealMensal);
+  }
+
+  return valorAtual;
+}
+
+  void _calcularInvestimento() async {
     FocusScope.of(context).unfocus(); 
 
     final double? valor = double.tryParse(_valorController.text.replaceAll(',', '.')); 
     final int? periodo = int.tryParse(_periodoController.text);
+    final double taxa = double.tryParse(_porcentagemIpcaController.text) ?? 0.0;
     final String? tipoTaxa = _tipoTaxaSelecionada;
 
     if (valor == null || valor <= 0 || periodo == null || periodo <= 0 || tipoTaxa == null) {
@@ -64,37 +144,32 @@ class _NovoInvestimentoScreenState extends State<NovoInvestimentoScreen> {
     }
 
     double taxaAnual = 0.0;
-    // TODO: Buscar taxas reais de uma API ou configuração
+    double resultado = 0.0;
+
     switch (tipoTaxa) {
-      case 'SELIC':
-        taxaAnual = 0.1050; // Exemplo: 10.50% a.a. (valor atual da Selic em Maio/2024 era ~10.50%)
+      case 'Pós-fixado':
+        taxaAnual = (await fetchSelicTax() * (taxa/100))/100;
+        resultado = valor * pow(1 + pow(1 + taxaAnual, 1 / 12) - 1, periodo.toDouble());
         break;
       case 'IPCA':
-        taxaAnual = 0.0380; // Exemplo: IPCA acumulado 12 meses ~3.80% (Maio/2024) + spread (ex: +5% = 0.0880)
-        // Para IPCA + X%, você precisaria de outro campo para o X% ou um valor fixo de spread.
-        // Aqui, vamos simular IPCA + 5% = 0.0380 (IPCA) + 0.05 (spread) = 0.0880
-        taxaAnual = 0.0380 + 0.05; // IPCA + 5%
+        resultado = await calcularValorFinalCdbIpcaMaisCompleto(
+          valorInicial: valor,
+          ganhoRealAnualPorcentagem: taxa,
+          prazoEmMeses: periodo,
+          dataInicioInvestimento: DateTime.now(),
+          todasProjecoesIpcaMensais: await fetchIpcaTax(),
+        );
         break;
-      case 'Pré-fixada':
-        taxaAnual = 0.11; // Exemplo: 11% a.a.
-        break;
-      case 'Pós-fixada':
-        // Geralmente atrelada a um % do CDI. CDI é próximo da SELIC.
-        // Exemplo: 100% do CDI (CDI ~ SELIC - 0.10%)
-        double cdiEstimado = 0.1040; // Exemplo: 10.40% a.a.
-        taxaAnual = cdiEstimado * 1.0; // 100% do CDI
-        break;
-    }
-
-    double taxaMensal = pow(1 + taxaAnual, 1 / 12) - 1;
-    double resultado = valor * pow(1 + taxaMensal, periodo.toDouble()); // periodo precisa ser double para pow
+    }    
 
     setState(() {
       _resultadoPrevisto = 'R\$ ${resultado.toStringAsFixed(2)}';
     });
   }
 
-  Widget _buildTextFieldWithLabel(String label, TextInputType keyboardType, TextEditingController controller) {
+  Widget _buildTextFieldWithLabel(String label, TextInputType keyboardType, TextEditingController controller, {
+    List<TextInputFormatter>? inputFormatters,
+    }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -103,9 +178,9 @@ class _NovoInvestimentoScreenState extends State<NovoInvestimentoScreen> {
         TextFormField(
           controller: controller, 
           decoration: InputDecoration(
-             // Estilo herdado do tema global
           ),
           keyboardType: keyboardType,
+          inputFormatters: inputFormatters,
         ),
         const SizedBox(height: 20.0), 
       ],
@@ -130,7 +205,7 @@ class _NovoInvestimentoScreenState extends State<NovoInvestimentoScreen> {
                   decoration: BoxDecoration(
                     color: Colors.black.withOpacity(0.4),
                     image: DecorationImage(
-                      image: const NetworkImage('https://via.placeholder.com/600x200.png/222222/FFFFFF?text=Fundo+Mercado'), // Placeholder
+                      image: const AssetImage('assets/images/background-header.png'),
                       fit: BoxFit.cover,
                       colorFilter: ColorFilter.mode(
                         Colors.black.withOpacity(0.6),
@@ -194,7 +269,18 @@ class _NovoInvestimentoScreenState extends State<NovoInvestimentoScreen> {
                       });
                     },
                   ),
-                  const SizedBox(height: 40.0),
+
+                  const SizedBox(height: 20.0),
+                  _buildTextFieldWithLabel(
+                    'Taxa (%)',
+                    const TextInputType.numberWithOptions(decimal: true),
+                    _porcentagemIpcaController,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(RegExp(r'^\d+[\.]?\d{0,2}')),
+                    ],
+                  ),
+                  
+                  const SizedBox(height: 20.0),
 
                   ElevatedButton(
                     onPressed: _calcularInvestimento, 
@@ -230,26 +316,6 @@ class _NovoInvestimentoScreenState extends State<NovoInvestimentoScreen> {
             ),
           ],
         ),
-      ),
-      bottomNavigationBar: BottomNavigationBar(
-        items: const <BottomNavigationBarItem>[
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home_outlined), 
-            label: 'Home', 
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.settings_outlined),
-            label: 'Ajustes',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.exit_to_app),
-            label: 'Sair',
-          ),
-        ],
-        currentIndex: _selectedIndex == -1 ? 0 : _selectedIndex, 
-        onTap: _onItemTapped,
-        type: BottomNavigationBarType.fixed,
-        showUnselectedLabels: true,
       ),
     );
   }

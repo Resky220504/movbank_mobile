@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -7,8 +9,53 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
+Future<String> fetchSelicTax() async {
+    final url = Uri.parse('https://api.bcb.gov.br/dados/serie/bcdata.sgs.1178/dados?formato=json&dataInicial=01/01/2025');
+    final response = await http.get(url);
+
+    if (response.statusCode == 200) {
+    final List<dynamic> data = jsonDecode(response.body);
+    
+    if (data.isNotEmpty && data.last['valor'] != null) {
+      return data.last['valor'].toString();
+    } else {
+      throw Exception('Lista vazia ou valor não encontrado');
+    }
+  } else {
+    throw Exception('Erro na requisição: ${response.statusCode}');
+  }
+}
+
+Future<String> fetchIpcaTax() async {
+    final url = Uri.parse('https://api.bcb.gov.br/dados/serie/bcdata.sgs.433/dados?formato=json&dataInicial=01/01/2025');
+    final response = await http.get(url);
+
+    if (response.statusCode == 200) {
+    final List<dynamic> data = jsonDecode(response.body);
+    
+    if (data.isNotEmpty && data.last['valor'] != null) {
+      return data.last['valor'].toString();
+    } else {
+      throw Exception('Lista vazia ou valor não encontrado');
+    }
+  } else {
+    throw Exception('Erro na requisição: ${response.statusCode}');
+  }
+}
+
 class _HomeScreenState extends State<HomeScreen> {
-  int _selectedIndex = 0; // Controla o item selecionado na BottomNavBar
+  int _selectedIndex = 0;
+
+  late Future<String> _selicTaxFuture;
+  late Future<String> _ipcaTaxFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    // Initialize the futures when the widget is created
+    _selicTaxFuture = fetchSelicTax();
+    _ipcaTaxFuture = fetchIpcaTax();
+  }
 
   void _onItemTapped(int index) {
     setState(() {
@@ -94,88 +141,73 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Center(
-              // Substituído o Icon pelo Image.asset
-              child: Image.asset(
-                'assets/images/LOGO.png', // Caminho para sua logo
-                height: 80.0, // Ajuste a altura conforme necessário
-              ),
-            ),
-            const SizedBox(height: 30.0),
-
-            const Text(
-              'Resumo de Taxas',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 20.0),
-
-            _buildTaxaCard(context, 'Taxa SELIC', '13,5%'), // TODO: Usar valores dinâmicos
-            _buildTaxaCard(context, 'Taxa IPCA', '3%'),    // TODO: Usar valores dinâmicos
-            const SizedBox(height: 20.0),
-
-            ElevatedButton.icon(
-              icon: const Icon(Icons.add, size: 24),
-              label: const Text('Novo Investimento',
-                  style: TextStyle(fontSize: 18)),
-              style: ElevatedButton.styleFrom(
-                minimumSize: const Size(double.infinity, 60), 
-              ),
-              onPressed: () {
-                Navigator.pushNamed(context, '/novo_investimento');
-              },
-            ),
-            const SizedBox(height: 40.0),
-
-            Container(
-              padding: const EdgeInsets.all(16.0),
-              decoration: BoxDecoration(
-                color: Colors.grey[850], 
-                borderRadius: BorderRadius.circular(12.0),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Calculos recentes',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 500),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: <Widget>[
+                Center(
+                  // Substituído o Icon pelo Image.asset
+                  child: Image.asset(
+                    'assets/images/LOGO.png', // Caminho para sua logo
+                    height: 80.0, // Ajuste a altura conforme necessário
                   ),
-                  const SizedBox(height: 20.0),
-                  _buildRecentHeader(),
-                  const Divider(color: Colors.grey, height: 20),
-                  // TODO: Substituir por uma lista dinâmica de cálculos reais
-                  _buildRecentRowPlaceholder(),
-                  const Divider(color: Colors.grey, height: 1),
-                  _buildRecentRowPlaceholder(),
-                  const Divider(color: Colors.grey, height: 1),
-                  _buildRecentRowPlaceholder(),
-                ],
-              ),
+                ),
+                const SizedBox(height: 30.0),
+
+                const Text(
+                  'Resumo de Taxas',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 20.0),
+
+                FutureBuilder<String>(
+                  future: _selicTaxFuture,
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return _buildTaxaCard(context, 'Taxa SELIC', 'Carregando...');
+                    } else if (snapshot.hasError) {
+                      return _buildTaxaCard(context, 'Taxa SELIC', 'Erro: ${snapshot.error}');
+                    } else if (snapshot.hasData) {
+                      return _buildTaxaCard(context, 'Taxa SELIC', '${snapshot.data}%');
+                    }
+                    return _buildTaxaCard(context, 'Taxa SELIC', 'N/A');
+                  },
+                ),
+
+                FutureBuilder<String>(
+                  future: _ipcaTaxFuture,
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return _buildTaxaCard(context, 'Taxa IPCA', 'Carregando...');
+                    } else if (snapshot.hasError) {
+                      return _buildTaxaCard(context, 'Taxa IPCA', 'Erro: ${snapshot.error}');
+                    } else if (snapshot.hasData) {
+                      return _buildTaxaCard(context, 'Taxa IPCA', '${snapshot.data}%');
+                    }
+                    return _buildTaxaCard(context, 'Taxa IPCA', 'N/A');
+                  },
+                ),
+
+                const SizedBox(height: 20.0),
+
+                ElevatedButton.icon(
+                  icon: const Icon(Icons.add, size: 24),
+                  label: const Text('Novo Investimento',
+                      style: TextStyle(fontSize: 18)),
+                  style: ElevatedButton.styleFrom(
+                    minimumSize: const Size(double.infinity, 60), 
+                  ),
+                  onPressed: () {
+                    Navigator.pushNamed(context, '/novo_investimento');
+                  },
+                ),
+                const SizedBox(height: 40.0),
+              ],
             ),
-          ],
+          ),
         ),
-      ),
-      bottomNavigationBar: BottomNavigationBar(
-        items: const <BottomNavigationBarItem>[
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person_outline),
-            label: 'Perfil',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.settings_outlined),
-            label: 'Ajustes',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.exit_to_app),
-            label: 'Sair',
-          ),
-        ],
-        currentIndex: _selectedIndex,
-        onTap: _onItemTapped,
-        type: BottomNavigationBarType.fixed, 
-        showUnselectedLabels: true, 
       ),
     );
   }
