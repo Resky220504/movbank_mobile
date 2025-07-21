@@ -1,9 +1,22 @@
+// lib/main.dart
+
 import 'package:flutter/material.dart';
+import 'package:movbank_mobile/theme/app_theme.dart';
+import 'package:movbank_mobile/theme/theme_notifier.dart';
+import 'package:provider/provider.dart';
 import 'screens/home_screen.dart';
 import 'screens/novo_investimento_screen.dart';
 
 void main() {
-  runApp(const MyApp());
+  runApp(
+    ChangeNotifierProvider(
+      create:
+          (_) => ThemeNotifier(
+            ThemeMode.dark,
+          ), // Define o tema inicial como escuro
+      child: const MyApp(),
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {
@@ -11,57 +24,13 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final themeNotifier = Provider.of<ThemeNotifier>(context);
+
     return MaterialApp(
       title: 'App Financeiro',
-      // Correção: Adicionado um ThemeData escuro e consistente
-      theme: ThemeData(
-        brightness: Brightness.dark,
-        primaryColor: Colors.limeAccent, 
-        scaffoldBackgroundColor: Colors.grey[900],
-        appBarTheme: AppBarTheme(
-          backgroundColor: Colors.grey[850],
-          foregroundColor: Colors.white,
-        ),
-        cardColor: Colors.grey[800],
-        elevatedButtonTheme: ElevatedButtonThemeData(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.limeAccent,
-            foregroundColor: Colors.black,
-            padding: const EdgeInsets.symmetric(vertical: 15.0),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8.0),
-            ),
-          ),
-        ),
-        inputDecorationTheme: InputDecorationTheme(
-            labelStyle: const TextStyle(color: Colors.white70),
-            enabledBorder: OutlineInputBorder(
-              borderSide: BorderSide(color: Colors.grey[700]!),
-              borderRadius: BorderRadius.circular(8.0),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderSide: const BorderSide(color: Colors.limeAccent),
-              borderRadius: BorderRadius.circular(8.0),
-            ),
-            filled: true,
-            fillColor: Colors.grey[800],
-            hintStyle: const TextStyle(color: Colors.white54),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 16.0),
-        ),
-         bottomNavigationBarTheme: BottomNavigationBarThemeData(
-             backgroundColor: Colors.grey[850],
-             selectedItemColor: Colors.limeAccent,
-             unselectedItemColor: Colors.grey[600],
-         ),
-         iconTheme: const IconThemeData(color: Colors.limeAccent),
-         textTheme: const TextTheme(
-           bodyLarge: TextStyle(color: Colors.white),
-           bodyMedium: TextStyle(color: Colors.white70),
-           titleLarge: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-           titleMedium: TextStyle(color: Colors.white),
-         ),
-         dividerColor: Colors.grey[700],
-      ),
+      theme: AppTheme.lightTheme,
+      darkTheme: AppTheme.darkTheme,
+      themeMode: themeNotifier.getThemeMode(),
       initialRoute: '/home',
       routes: {
         '/home': (context) => const HomeScreen(),

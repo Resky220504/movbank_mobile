@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:movbank_mobile/theme/theme_notifier.dart';
+import 'package:provider/provider.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
@@ -10,12 +12,14 @@ class HomeScreen extends StatefulWidget {
 }
 
 Future<String> fetchSelicTax() async {
-    final url = Uri.parse('https://api.bcb.gov.br/dados/serie/bcdata.sgs.1178/dados?formato=json&dataInicial=01/01/2025');
-    final response = await http.get(url);
+  final url = Uri.parse(
+    'https://api.bcb.gov.br/dados/serie/bcdata.sgs.1178/dados?formato=json&dataInicial=01/01/2025',
+  );
+  final response = await http.get(url);
 
-    if (response.statusCode == 200) {
+  if (response.statusCode == 200) {
     final List<dynamic> data = jsonDecode(response.body);
-    
+
     if (data.isNotEmpty && data.last['valor'] != null) {
       return data.last['valor'].toString();
     } else {
@@ -27,12 +31,14 @@ Future<String> fetchSelicTax() async {
 }
 
 Future<String> fetchIpcaTax() async {
-    final url = Uri.parse('https://api.bcb.gov.br/dados/serie/bcdata.sgs.433/dados?formato=json&dataInicial=01/01/2025');
-    final response = await http.get(url);
+  final url = Uri.parse(
+    'https://api.bcb.gov.br/dados/serie/bcdata.sgs.433/dados?formato=json&dataInicial=01/01/2025',
+  );
+  final response = await http.get(url);
 
-    if (response.statusCode == 200) {
+  if (response.statusCode == 200) {
     final List<dynamic> data = jsonDecode(response.body);
-    
+
     if (data.isNotEmpty && data.last['valor'] != null) {
       return data.last['valor'].toString();
     } else {
@@ -44,7 +50,7 @@ Future<String> fetchIpcaTax() async {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  int _selectedIndex = 0;
+  final int _selectedIndex = 0;
 
   late Future<String> _selicTaxFuture;
   late Future<String> _ipcaTaxFuture;
@@ -55,29 +61,6 @@ class _HomeScreenState extends State<HomeScreen> {
     // Initialize the futures when the widget is created
     _selicTaxFuture = fetchSelicTax();
     _ipcaTaxFuture = fetchIpcaTax();
-  }
-
-  void _onItemTapped(int index) {
-    setState(() {
-      _selectedIndex = index;
-      if (index == 2) {
-        Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
-      } else if (index == 0) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('Tela de Perfil ainda não implementada.'),
-              duration: Duration(seconds: 1)),
-        );
-        _selectedIndex = 0; 
-      } else if (index == 1) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('Tela de Ajustes ainda não implementada.'),
-              duration: Duration(seconds: 1)),
-        );
-         _selectedIndex = 0;
-      }
-    });
   }
 
   Widget _buildTaxaCard(BuildContext context, String title, String value) {
@@ -92,9 +75,10 @@ class _HomeScreenState extends State<HomeScreen> {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(title, style: const TextStyle(fontSize: 16)),
-          Text(value,
-              style:
-                  const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          Text(
+            value,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          ),
         ],
       ),
     );
@@ -104,14 +88,22 @@ class _HomeScreenState extends State<HomeScreen> {
     return const Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text('Valor',
-            style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
-        Text('Taxa',
-            style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
-        Text('Período',
-            style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
-        Text('Resultado',
-            style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
+        Text(
+          'Valor',
+          style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold),
+        ),
+        Text(
+          'Taxa',
+          style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold),
+        ),
+        Text(
+          'Período',
+          style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold),
+        ),
+        Text(
+          'Resultado',
+          style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold),
+        ),
       ],
     );
   }
@@ -133,11 +125,24 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final themeNotifier = Provider.of<ThemeNotifier>(context);
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Home'),
         centerTitle: true,
-        automaticallyImplyLeading: false, 
+        automaticallyImplyLeading: false,
+        actions: [
+          Switch(
+            value: themeNotifier.getThemeMode() == ThemeMode.dark,
+            onChanged: (value) {
+              themeNotifier.setThemeMode(
+                value ? ThemeMode.dark : ThemeMode.light,
+              );
+            },
+            activeColor: Colors.limeAccent,
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20.0),
@@ -166,11 +171,23 @@ class _HomeScreenState extends State<HomeScreen> {
                   future: _selicTaxFuture,
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) {
-                      return _buildTaxaCard(context, 'Taxa SELIC', 'Carregando...');
+                      return _buildTaxaCard(
+                        context,
+                        'Taxa SELIC',
+                        'Carregando...',
+                      );
                     } else if (snapshot.hasError) {
-                      return _buildTaxaCard(context, 'Taxa SELIC', 'Erro: ${snapshot.error}');
+                      return _buildTaxaCard(
+                        context,
+                        'Taxa SELIC',
+                        'Erro: ${snapshot.error}',
+                      );
                     } else if (snapshot.hasData) {
-                      return _buildTaxaCard(context, 'Taxa SELIC', '${snapshot.data}%');
+                      return _buildTaxaCard(
+                        context,
+                        'Taxa SELIC',
+                        '${snapshot.data}%',
+                      );
                     }
                     return _buildTaxaCard(context, 'Taxa SELIC', 'N/A');
                   },
@@ -180,11 +197,23 @@ class _HomeScreenState extends State<HomeScreen> {
                   future: _ipcaTaxFuture,
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) {
-                      return _buildTaxaCard(context, 'Taxa IPCA', 'Carregando...');
+                      return _buildTaxaCard(
+                        context,
+                        'Taxa IPCA',
+                        'Carregando...',
+                      );
                     } else if (snapshot.hasError) {
-                      return _buildTaxaCard(context, 'Taxa IPCA', 'Erro: ${snapshot.error}');
+                      return _buildTaxaCard(
+                        context,
+                        'Taxa IPCA',
+                        'Erro: ${snapshot.error}',
+                      );
                     } else if (snapshot.hasData) {
-                      return _buildTaxaCard(context, 'Taxa IPCA', '${snapshot.data}%');
+                      return _buildTaxaCard(
+                        context,
+                        'Taxa IPCA',
+                        '${snapshot.data}%',
+                      );
                     }
                     return _buildTaxaCard(context, 'Taxa IPCA', 'N/A');
                   },
@@ -194,10 +223,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
                 ElevatedButton.icon(
                   icon: const Icon(Icons.add, size: 24),
-                  label: const Text('Novo Investimento',
-                      style: TextStyle(fontSize: 18)),
+                  label: const Text(
+                    'Novo Investimento',
+                    style: TextStyle(fontSize: 18),
+                  ),
                   style: ElevatedButton.styleFrom(
-                    minimumSize: const Size(double.infinity, 60), 
+                    minimumSize: const Size(double.infinity, 60),
                   ),
                   onPressed: () {
                     Navigator.pushNamed(context, '/novo_investimento');
